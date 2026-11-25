@@ -10,10 +10,34 @@ const taskStats = document.getElementById('task-stats');
 const filterButtons = document.querySelectorAll('.filter-btn');
 const subjectFilter = document.getElementById('subject-filter');
 
+const LOCAL_STORAGE_KEY = 'student_task_manager_tasks_v1';
+const SAMPLE_TASKS = [
+  {
+    id: 'sample-1',
+    title: 'Finish Calculus Problem Set 3',
+    subject: 'Mathematics',
+    dueDate: '2026-11-28',
+    priority: 'high',
+    completed: false,
+    createdAt: '2026-11-26T00:55:00.000Z',
+  },
+  {
+    id: 'sample-2',
+    title: 'Read Chapter 4: Cell Structure',
+    subject: 'Biology',
+    dueDate: '2026-11-30',
+    priority: 'medium',
+    completed: false,
+    createdAt: '2026-11-26T00:56:00.000Z',
+  },
+];
+
 // Application state
 let tasks = [];
 let statusFilter = 'all';
 let selectedSubject = 'all';
+// Uses 'api' when Express is available, or 'local' on static hosts like GitHub Pages.
+let storageMode = 'api';
 
 /**
  * Shared fetch helper so every API call handles JSON and errors consistently.
@@ -29,6 +53,24 @@ async function apiRequest(url, options = {}) {
     throw new Error(data.error || `Request failed (${response.status})`);
   }
   return data;
+}
+
+function readLocalTasks() {
+  const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+  if (saved === null) {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(SAMPLE_TASKS));
+    return SAMPLE_TASKS.map((task) => ({ ...task }));
+  }
+  try {
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalTasks(nextTasks) {
+  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(nextTasks));
 }
 
 function showError(message) {
@@ -192,24 +234,37 @@ function render() {
 
 async function loadTasks() {
   try {
-    tasks = await apiRequest('/api/tasks');
-    render();
-  } catch (err) {
-    taskList.innerHTML = '';
-    const errorItem = document.createElement('li');
-    errorItem.className = 'empty-state';
-    errorItem.textContent = `Could not load tasks: ${err.message}`;
-    taskList.appendChild(errorItem);
+    const response = await fetch('api/tasks');
+    const contentType = response.headers.get('content-type') || '';
+    if (response.ok && contentType.includes('application/json')) {
+      storageMode = 'api';
+      tasks = await response.json();
+      render();
+      return;
+    }
+  } catch {
+    // Fall back to localStorage when no Express backend is reachable.
   }
+
+  storageMode = 'local';
+  tasks = readLocalTasks();
+  render();
 }
 
 async function toggleTask(id, completed) {
   try {
-    const updated = await apiRequest(`/api/tasks/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ completed }),
-    });
-    tasks = tasks.map((task) => (task.id === id ? updated : task));
+    if (storageMode === 'api') {
+      const updated = await apiRequest(`api/tasks/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ completed }),
+      });
+      tasks = tasks.map((task) => (task.id === id ? updated : task));
+    } else {
+      tasks = tasks.map((task) =>
+        task.id === id ? { ...task, completed } : task
+      );
+      writeLocalTasks(tasks);
+    }
     render();
   } catch (err) {
     showError(err.message);
@@ -219,8 +274,13 @@ async function toggleTask(id, completed) {
 
 async function deleteTask(id) {
   try {
-    await apiRequest(`/api/tasks/${id}`, { method: 'DELETE' });
+    if (storageMode === 'api') {
+      await apiRequest(`api/tasks/${id}`, { method: 'DELETE' });
+    }
     tasks = tasks.filter((task) => task.id !== id);
+    if (storageMode === 'local') {
+      writeLocalTasks(tasks);
+    }
     render();
   } catch (err) {
     showError(err.message);
@@ -262,11 +322,28 @@ taskForm.addEventListener('submit', async (event) => {
 
   submitBtn.disabled = true;
   try {
-    const created = await apiRequest('/api/tasks', {
-      method: 'POST',
-      body: JSON.stringify({ title, subject, dueDate, priority }),
-    });
-    tasks.push(created);
+    if (storageMode === 'api') {
+      const created = await apiRequest('api/tasks', {
+        method: 'POST',
+        body: JSON.stringify({ title, subject, dueDate, priority }),
+      });
+      tasks.push(created);
+    } else {
+      const created = {
+        id:
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `task-${Date.now()}`,
+        title,
+        subject,
+        dueDate,
+        priority,
+        completed: false,
+        createdAt: new Date().toISOString(),
+      };
+      tasks.push(created);
+      writeLocalTasks(tasks);
+    }
     taskForm.reset();
     render();
     titleInput.focus();
