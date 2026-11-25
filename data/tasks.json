@@ -1,0 +1,20 @@
+[
+  {
+    "id": "sample-1",
+    "title": "Finish Calculus Problem Set 3",
+    "subject": "Mathematics",
+    "dueDate": "2026-11-28",
+    "priority": "high",
+    "completed": false,
+    "createdAt": "2026-11-26T00:55:00.000Z"
+  },
+  {
+    "id": "sample-2",
+    "title": "Read Chapter 4: Cell Structure",
+    "subject": "Biology",
+    "dueDate": "2026-11-30",
+    "priority": "medium",
+    "completed": false,
+    "createdAt": "2026-11-26T00:56:00.000Z"
+  }
+]

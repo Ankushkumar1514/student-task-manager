@@ -1,0 +1,20 @@
+{
+  "name": "student-task-manager",
+  "version": "1.0.0",
+  "description": "A beginner-friendly full-stack Student Task Manager built with Node.js, Express, and HTML/CSS/JS.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "student",
+    "task-manager",
+    "express",
+    "nodejs"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "express": "^5.3.0"
+  }
+}
